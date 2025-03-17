@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
-const Quagga = require("quagga");
+import { useRef, useEffect } from "react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { Result } from "@zxing/library";
 
 interface BarcodeScannerProps {
   isScanning: boolean;
   setScannedCode: (code: string) => void;
-  setIsScanning: (value: boolean) => void;
+  setIsScanning: (isScanning: boolean) => void;
 }
 
 const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
@@ -12,64 +13,50 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   setScannedCode,
   setIsScanning,
 }) => {
-  const scannerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const codeReader = useRef(new BrowserMultiFormatReader());
 
   useEffect(() => {
-    if (isScanning && scannerRef.current) {
-      Quagga.init(
-        {
-          inputStream: {
-            type: "LiveStream",
-            target: scannerRef.current,
-            constraints: {
-              facingMode: "environment", // Cámara trasera
-              width: { ideal: 640 }, // Mejor resolución
-              height: { ideal: 480 },
-            },
-          },
-          decoder: {
-            readers: ["ean_reader", "code_128_reader", "upc_reader"],
-          },
-          locate: true, // Activar localización automática
-          locator: {
-            patchSize: "large", // Aumenta la sensibilidad
-            halfSample: false,
-          },
-        },
-        (err: Error | null) => {
-          if (err) {
-            console.error("Error al iniciar Quagga:", err);
-            return;
+    const videoElement = videoRef.current;
+
+    if (isScanning && videoElement) {
+      codeReader.current
+        .decodeFromVideoDevice(undefined, videoElement, (result: Result | undefined, error: unknown) => {
+          if (result) {
+            console.log("Código detectado:", result.getText());
+            setScannedCode(result.getText());
+            setIsScanning(false);
+            stopScanning(); // Detiene el escaneo cuando se detecta un código
           }
-          Quagga.start();
-        }
-      );
 
-      Quagga.onProcessed((result: any) => {
-        if (result) {
-          console.log("Frame analizado:", result);
-        }
-      });
-
-      const onDetected = (data: { codeResult: { code: string } }) => {
-        console.log("Código detectado:", data.codeResult.code);
-
-        setScannedCode(data.codeResult.code);
-        setIsScanning(false);
-
-        Quagga.stop();
-      };
-
-      Quagga.onDetected(onDetected);
-
-      return () => {
-        Quagga.offDetected(onDetected);
-        Quagga.stop();
-      };
+          if (error) {
+            console.error("Error al escanear:", error);
+          }
+        })
+        .catch((err) => console.error("Error al iniciar el escáner:", err));
+    } else {
+      stopScanning(); // Detiene el escaneo si isScanning es falso
     }
-  }, [isScanning, setScannedCode, setIsScanning]);
 
-  return <div ref={scannerRef} style={{ width: "100%", height: "400px" }} />;
+    return () => {
+      stopScanning(); // Detiene el escaneo cuando se desmonta el componente
+    };
+  }, [isScanning]);
+
+  const stopScanning = () => {
+    // Detiene la transmisión de video
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  return (
+    <div>
+      <video ref={videoRef} style={{ width: "100%" }} />
+    </div>
+  );
 };
 
 export default BarcodeScanner;
