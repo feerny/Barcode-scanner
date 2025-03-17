@@ -12,7 +12,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   setScannedCode,
   setIsScanning,
 }) => {
-  const scannerRef = useRef<HTMLDivElement>(null); // Referencia para el div donde se renderiza la cámara
+  const scannerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isScanning && scannerRef.current) {
@@ -20,13 +20,20 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
         {
           inputStream: {
             type: "LiveStream",
-            target: scannerRef.current, // Asegurar que Quagga use este div
+            target: scannerRef.current,
             constraints: {
               facingMode: "environment", // Cámara trasera
+              width: { ideal: 640 }, // Mejor resolución
+              height: { ideal: 480 },
             },
           },
           decoder: {
             readers: ["ean_reader", "code_128_reader", "upc_reader"],
+          },
+          locate: true, // Activar localización automática
+          locator: {
+            patchSize: "large", // Aumenta la sensibilidad
+            halfSample: false,
           },
         },
         (err: Error | null) => {
@@ -38,15 +45,19 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
         }
       );
 
+      Quagga.onProcessed((result: any) => {
+        if (result) {
+          console.log("Frame analizado:", result);
+        }
+      });
+
       const onDetected = (data: { codeResult: { code: string } }) => {
         console.log("Código detectado:", data.codeResult.code);
 
         setScannedCode(data.codeResult.code);
         setIsScanning(false);
-        
-        if (Quagga) {
-          Quagga.stop();
-        }
+
+        Quagga.stop();
       };
 
       Quagga.onDetected(onDetected);
