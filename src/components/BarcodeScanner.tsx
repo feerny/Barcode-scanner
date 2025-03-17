@@ -6,7 +6,7 @@ const BarcodeScanner = () => {
   const [isScanning, setIsScanning] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const codeReader = useRef(new BrowserMultiFormatReader());
-
+//PDF417
   useEffect(() => {
     const videoElement = videoRef.current;
 
@@ -21,6 +21,7 @@ const BarcodeScanner = () => {
               setScannedCode(result.getText());
               setIsScanning(false);
               codeReader.current.reset(); // Detener el escaneo
+              alert("Se escaneo el codigo");
             }
 
             if (error) {
